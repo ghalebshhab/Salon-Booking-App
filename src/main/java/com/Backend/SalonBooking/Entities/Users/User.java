@@ -1,5 +1,6 @@
 package com.Backend.SalonBooking.Entities.Users;
 
+import com.Backend.SalonBooking.Entities.Salons.Salon;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -22,4 +23,8 @@ public class User {
     private String password;
     private Role role;
     private String phoneNumber;
+    @JoinColumn(name = "salon_id")
+    @OneToOne(cascade = CascadeType.ALL)
+    private Salon salon;
+
 }

@@ -1,5 +1,6 @@
 package com.Backend.SalonBooking.Dtos.Auth.Login;
 
+import com.Backend.SalonBooking.Entities.Users.Role;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,7 +13,7 @@ public class LoginResponse {
     private String token;
     private String type="Bearer";
     private String email;
-    private String password;
     private String userName;
-    private String role;
+    private Role role;
+    private Long Id;
 }
