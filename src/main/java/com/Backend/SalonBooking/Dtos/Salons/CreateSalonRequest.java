@@ -1,6 +1,7 @@
 package com.Backend.SalonBooking.Dtos.Salons;
 
 import com.Backend.SalonBooking.Entities.Salons.State;
+import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -24,4 +25,8 @@ public class CreateSalonRequest {
     private State state;
 
     private List<String> Images;
+
+    private int maxNumOfEmployees;
+
+    private int currentNumOfEmployees;
 }

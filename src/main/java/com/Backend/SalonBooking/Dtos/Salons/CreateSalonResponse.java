@@ -25,4 +25,6 @@ public class CreateSalonResponse {
     private State state;
     private boolean isDeleted=false;
     private List<String> Images;
+    private int maxNumOfEmployees;
+    private int currentNumOfEmployees;
 }

@@ -21,10 +21,11 @@ public class User {
     private String username;
     private String email;
     private String password;
+    @Enumerated(EnumType.STRING)
     private Role role;
     private String phoneNumber;
     @JoinColumn(name = "salon_id")
-    @OneToOne(cascade = CascadeType.ALL)
+    @OneToOne
     private Salon salon;
 
 }

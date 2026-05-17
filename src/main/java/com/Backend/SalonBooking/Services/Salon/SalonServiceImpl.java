@@ -3,10 +3,15 @@ package com.Backend.SalonBooking.Services.Salon;
 import com.Backend.SalonBooking.Dtos.ApiResponse;
 import com.Backend.SalonBooking.Dtos.Salons.CreateSalonRequest;
 import com.Backend.SalonBooking.Dtos.Salons.CreateSalonResponse;
+import com.Backend.SalonBooking.Dtos.Salons.SalonEmployeeResponse;
 import com.Backend.SalonBooking.Dtos.Salons.UpdateSalonInfoRequest;
+import com.Backend.SalonBooking.Entities.SalonEmployees.EmployeeStatus;
+import com.Backend.SalonBooking.Entities.SalonEmployees.Salonemps;
 import com.Backend.SalonBooking.Entities.Salons.Salon;
 import com.Backend.SalonBooking.Entities.Salons.State;
+import com.Backend.SalonBooking.Entities.Users.Role;
 import com.Backend.SalonBooking.Entities.Users.User;
+import com.Backend.SalonBooking.Repositories.SalonEmployeesRepo;
 import com.Backend.SalonBooking.Repositories.SalonRepo;
 import com.Backend.SalonBooking.Repositories.UserRepo;
 import lombok.AllArgsConstructor;
@@ -22,6 +27,7 @@ public class SalonServiceImpl implements SalonService {
 
     private final UserRepo userRepo;
     private final SalonRepo salonRepo;
+    private final SalonEmployeesRepo salonEmployeesRepo;
 
     @Override
     public ApiResponse<CreateSalonResponse> createSalon(CreateSalonRequest createSalonRequest,String emailFromToken) {
@@ -63,9 +69,13 @@ public class SalonServiceImpl implements SalonService {
         salon.setName(createSalonRequest.getName());
         salon.setOpenTime(createSalonRequest.getOpenTime());
         salon.setCloseTime(createSalonRequest.getCloseTime());
+        salon.setState(calculateState(createSalonRequest.getOpenTime(),createSalonRequest.getCloseTime()));
+        user.setRole(Role.OWNER);
+        userRepo.save(user);
         salon.setOwner(user);
         salon.setImages(createSalonRequest.getImages());
-
+        salon.setCurrentNumOfEmployees(createSalonRequest.getCurrentNumOfEmployees());
+        salon.setMaxNumOfEmployees(createSalonRequest.getMaxNumOfEmployees());
         salonRepo.save(salon);
 
         CreateSalonResponse response=toResponse(salon);
@@ -120,7 +130,11 @@ public class SalonServiceImpl implements SalonService {
         salon.setPhoneNumber(updateSalonInfoRequest.getPhoneNumber());
         salon.setImages(updateSalonInfoRequest.getImages());
         salon.setCity(updateSalonInfoRequest.getCity());
+        salon.setState(calculateState(updateSalonInfoRequest.getOpenTime(),updateSalonInfoRequest.getCloseTime()));
+        salon.setCurrentNumOfEmployees(updateSalonInfoRequest.getCurrentNumOfEmployees());
+        salon.setMaxNumOfEmployees(updateSalonInfoRequest.getMaxNumOfEmployees());
         salonRepo.save(salon);
+
         CreateSalonResponse response=toResponse(salon);
 
         return ApiResponse.success("Salon Information Updated Successfully", response);
@@ -132,7 +146,7 @@ public class SalonServiceImpl implements SalonService {
     if(user==null){
         return ApiResponse.error("User not found");
     }
-    Salon salon=salonRepo.findByowner(user).orElse(null);
+    Salon salon=salonRepo.findByOwner(user).orElse(null);
     if(salon==null){
         return ApiResponse.error("Salon not found");
     }
@@ -140,6 +154,27 @@ public class SalonServiceImpl implements SalonService {
     salonRepo.save(salon);
 
         return ApiResponse.success("Salon Deleted Successfully",null);
+    }
+    @Override
+    public ApiResponse<List<SalonEmployeeResponse>> getSalonEmployees(Long salonId) {
+
+        Salon salon = salonRepo.findById(salonId)
+                .orElse(null);
+
+        if (salon == null) {
+            return ApiResponse.error("Salon not found");
+        }
+
+        List<Salonemps> employees = salonEmployeesRepo.findBySalonIdAndStatus(
+                salonId,
+                EmployeeStatus.ACTIVE
+        );
+
+        List<SalonEmployeeResponse> response = employees.stream()
+                .map(this::mapToSalonEmployeeResponse)
+                .toList();
+
+        return ApiResponse.success("Salon employees returned successfully", response);
     }
 
     @Override
@@ -168,6 +203,8 @@ public class SalonServiceImpl implements SalonService {
         response.setOwnerId(salon.getOwner().getId());
         response.setSalonId(salon.getId());
         response.setDeleted(salon.getIsDeleted());
+        response.setCurrentNumOfEmployees(salon.getCurrentNumOfEmployees());
+        response.setMaxNumOfEmployees(salon.getMaxNumOfEmployees());
         return response;
     }
     private State calculateState(LocalTime openTime, LocalTime closeTime) {
@@ -179,6 +216,27 @@ public class SalonServiceImpl implements SalonService {
                         now.isBefore(closeTime);
 
         return isOpen ? State.OPEN : State.CLOSED;
+    }
+    private SalonEmployeeResponse mapToSalonEmployeeResponse(Salonemps salonEmployee) {
+
+        User user = salonEmployee.getEmployee();
+
+        SalonEmployeeResponse response = new SalonEmployeeResponse();
+
+        response.setEmployeeRecordId(salonEmployee.getId());
+        response.setStatus(salonEmployee.getStatus());
+        response.setJoinedAt(salonEmployee.getJoinedAt());
+
+        if (user != null) {
+            response.setUserId(user.getId());
+            response.setFirstName(user.getFirstName());
+            response.setLastName(user.getLastName());
+            response.setUsername(user.getUsername());
+            response.setEmail(user.getEmail());
+            response.setPhoneNumber(user.getPhoneNumber());
+        }
+
+        return response;
     }
 
 

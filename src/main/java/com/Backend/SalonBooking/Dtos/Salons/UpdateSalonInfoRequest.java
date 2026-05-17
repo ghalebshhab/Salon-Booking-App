@@ -23,4 +23,7 @@ public class UpdateSalonInfoRequest {
     private State state;
 
     private List<String> Images;
+    private int maxNumOfEmployees;
+
+    private int currentNumOfEmployees;
 }

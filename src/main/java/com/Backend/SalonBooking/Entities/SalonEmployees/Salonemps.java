@@ -26,11 +26,11 @@ public class Salonemps {
     private Long id;
 
     @JoinColumn(nullable = false,name = "salon_id")
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne
     private Salon salon;
 
     @JoinColumn(nullable = false,name = "employee_id")
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne
     private User employee;
 
     @Enumerated(EnumType.STRING)

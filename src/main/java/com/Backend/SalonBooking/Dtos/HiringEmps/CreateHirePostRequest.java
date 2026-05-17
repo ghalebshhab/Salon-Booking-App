@@ -9,9 +9,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class CreateHirePostRequest {
 
-    private Long salonId;
     private String title;
-    private String description;
-    private int numOfEmps;
 
+    private String description;
+
+    private int numOfEmps;
 }

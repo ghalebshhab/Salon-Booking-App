@@ -3,6 +3,7 @@ package com.Backend.SalonBooking.Controllers.Salon;
 import com.Backend.SalonBooking.Dtos.ApiResponse;
 import com.Backend.SalonBooking.Dtos.Salons.CreateSalonRequest;
 import com.Backend.SalonBooking.Dtos.Salons.CreateSalonResponse;
+import com.Backend.SalonBooking.Dtos.Salons.SalonEmployeeResponse;
 import com.Backend.SalonBooking.Dtos.Salons.UpdateSalonInfoRequest;
 import com.Backend.SalonBooking.Entities.Salons.Salon;
 import com.Backend.SalonBooking.Repositories.SalonRepo;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.Authenticator;
 import java.security.Principal;
+import java.util.List;
 
 @RestController()
 @RequestMapping("/api/salons")
@@ -28,6 +30,12 @@ public class SalonController {
             @PathVariable Long salonId){
       return  salonService.getSalonById(salonId);
    }
+    @GetMapping("/{salonId}/employees")
+    public ApiResponse<List<SalonEmployeeResponse>> getSalonEmployees(
+            @PathVariable Long salonId
+    ) {
+        return salonService.getSalonEmployees(salonId);
+    }
    @PostMapping("/createSalon")
     public ApiResponse<CreateSalonResponse> createSalon(
            @RequestBody CreateSalonRequest createSalonRequest,
