@@ -187,24 +187,66 @@ public class SalonServiceImpl implements SalonService {
 
         return ApiResponse.success("Salon Fetched Successfully", toResponse(salon));
     }
+    @Override
+    public ApiResponse<CreateSalonResponse> getMySalon(String emailFromToken) {
+
+        User user = userRepo.findByEmail(emailFromToken).orElse(null);
+
+        if (user == null) {
+            return ApiResponse.error("User not found");
+        }
+
+        Salon salon = salonRepo.findByOwner(user).orElse(null);
+
+        if (salon == null) {
+            return ApiResponse.error("Salon not found for this owner");
+        }
+
+        return ApiResponse.success("My salon returned successfully", toResponse(salon));
+    }
 
 
-    private CreateSalonResponse toResponse(Salon salon){
-        CreateSalonResponse response=new CreateSalonResponse();
-        response.setAddress(salon.getAddress());
+    private CreateSalonResponse toResponse(Salon salon) {
+
+        CreateSalonResponse response = new CreateSalonResponse();
+
+        response.setSalonId(salon.getId());
+
+        if (salon.getOwner() != null) {
+            User owner = salon.getOwner();
+
+            response.setOwnerId(owner.getId());
+
+            String ownerName =
+                    ((owner.getFirstName() == null ? "" : owner.getFirstName()) + " " +
+                            (owner.getLastName() == null ? "" : owner.getLastName())).trim();
+
+            if (ownerName.isBlank()) {
+                ownerName = owner.getUsername();
+            }
+
+            response.setOwnerName(ownerName);
+            response.setOwnerEmail(owner.getEmail());
+            response.setOwnerPhoneNumber(owner.getPhoneNumber());
+        }
+
+        response.setName(salon.getName());
         response.setEmail(salon.getEmail());
         response.setCity(salon.getCity());
+        response.setAddress(salon.getAddress());
+        response.setPhoneNumber(salon.getPhoneNumber());
+
         response.setOpenTime(salon.getOpenTime());
         response.setCloseTime(salon.getCloseTime());
-        response.setName(salon.getName());
-        response.setPhoneNumber(salon.getPhoneNumber());
-        response.setImages(salon.getImages());
         response.setState(salon.getState());
-        response.setOwnerId(salon.getOwner().getId());
-        response.setSalonId(salon.getId());
+
+        response.setImages(salon.getImages());
+
         response.setDeleted(salon.getIsDeleted());
+
         response.setCurrentNumOfEmployees(salon.getCurrentNumOfEmployees());
         response.setMaxNumOfEmployees(salon.getMaxNumOfEmployees());
+
         return response;
     }
     private State calculateState(LocalTime openTime, LocalTime closeTime) {
