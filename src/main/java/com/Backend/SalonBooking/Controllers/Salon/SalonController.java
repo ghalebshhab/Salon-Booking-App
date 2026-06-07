@@ -39,6 +39,10 @@ public class SalonController {
         String emailFromToken = authentication.getName();
         return salonService.getMySalon(emailFromToken);
     }
+    @GetMapping
+    public ApiResponse<List<CreateSalonResponse>> getAllPublicSalons() {
+        return salonService.getAllPublicSalons();
+    }
 
     @PostMapping("/createSalon")
     public ApiResponse<CreateSalonResponse> createSalon(

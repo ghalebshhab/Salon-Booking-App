@@ -28,4 +28,5 @@ public interface SalonService {
     ApiResponse<List<SalonEmployeeResponse>> getSalonEmployees(Long salonId);
 
     ApiResponse<CreateSalonResponse> getMySalon(String emailFromToken);
+    ApiResponse<List<CreateSalonResponse>> getAllPublicSalons();
 }

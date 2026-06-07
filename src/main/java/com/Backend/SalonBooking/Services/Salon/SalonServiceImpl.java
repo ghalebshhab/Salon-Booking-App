@@ -204,6 +204,16 @@ public class SalonServiceImpl implements SalonService {
 
         return ApiResponse.success("My salon returned successfully", toResponse(salon));
     }
+    @Override
+    public ApiResponse<List<CreateSalonResponse>> getAllPublicSalons() {
+
+        List<CreateSalonResponse> response = salonRepo.findByIsDeletedFalse()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+        return ApiResponse.success("Salons fetched successfully", response);
+    }
 
 
     private CreateSalonResponse toResponse(Salon salon) {
