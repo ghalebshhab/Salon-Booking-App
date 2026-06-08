@@ -25,6 +25,14 @@ public class BookingResponse {
     private Long salonId;
     private String salonName;
 
+    private Long assignedEmployeeId;
+    private Long assignedEmployeeUserId;
+    private String assignedEmployeeName;
+    private String assignedEmployeeEmail;
+    private String assignedEmployeePhoneNumber;
+    private String assignedEmployeeSpecialty;
+    private String assignedEmployeeImageUrl;
+
     private List<BookingServiceResponse> services;
 
     private LocalDate bookingDate;

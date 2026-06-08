@@ -7,10 +7,13 @@ import com.Backend.SalonBooking.Dtos.Bookings.CreateBookingRequest;
 import com.Backend.SalonBooking.Dtos.Bookings.OwnerBookingActionRequest;
 import com.Backend.SalonBooking.Entities.Bookings.Booking;
 import com.Backend.SalonBooking.Entities.Bookings.BookingStatus;
+import com.Backend.SalonBooking.Entities.SalonEmployees.EmployeeStatus;
+import com.Backend.SalonBooking.Entities.SalonEmployees.Salonemps;
 import com.Backend.SalonBooking.Entities.SalonServices.SalonServicesItem;
 import com.Backend.SalonBooking.Entities.Salons.Salon;
 import com.Backend.SalonBooking.Entities.Users.User;
 import com.Backend.SalonBooking.Repositories.BookingRepo;
+import com.Backend.SalonBooking.Repositories.SalonEmployeesRepo;
 import com.Backend.SalonBooking.Repositories.SalonRepo;
 import com.Backend.SalonBooking.Repositories.SalonServiceItemRepo;
 import com.Backend.SalonBooking.Repositories.UserRepo;
@@ -31,12 +34,17 @@ public class BookingServiceImpl implements BookingService {
     private final UserRepo userRepo;
     private final SalonRepo salonRepo;
     private final SalonServiceItemRepo salonServiceItemRepo;
+    private final SalonEmployeesRepo salonEmployeesRepo;
 
     @Override
     @Transactional
     public ApiResponse<BookingResponse> createBooking(CreateBookingRequest request) {
 
-        User customer = getCurrentUser();
+        User customer = getCurrentUserOrNull();
+
+        if (customer == null) {
+            return ApiResponse.error("Authenticated user not found");
+        }
 
         if (request.getSalonId() == null) {
             return ApiResponse.error("Salon id is required");
@@ -85,15 +93,30 @@ public class BookingServiceImpl implements BookingService {
             return ApiResponse.error("Booking time must be between salon open and close time");
         }
 
-        boolean timeAlreadyBooked = bookingRepo.existsBySalonIdAndBookingDateAndBookingTimeAndStatusIn(
+        boolean salonTimeAlreadyBooked = bookingRepo.existsBySalonIdAndBookingDateAndBookingTimeAndStatusIn(
                 salon.getId(),
                 request.getBookingDate(),
                 request.getBookingTime(),
                 List.of(BookingStatus.PENDING, BookingStatus.ACCEPTED)
         );
 
-        if (timeAlreadyBooked) {
+        if (salonTimeAlreadyBooked) {
             return ApiResponse.error("This time is already booked or pending");
+        }
+
+        Salonemps assignedEmployee = null;
+
+        if (request.getAssignedEmployeeId() != null) {
+            assignedEmployee = validateAssignedEmployee(
+                    request.getAssignedEmployeeId(),
+                    salon,
+                    request.getBookingDate(),
+                    request.getBookingTime()
+            );
+
+            if (assignedEmployee == null) {
+                return ApiResponse.error("Selected employee is not valid or not available");
+            }
         }
 
         List<SalonServicesItem> selectedServices = new ArrayList<>();
@@ -109,7 +132,7 @@ public class BookingServiceImpl implements BookingService {
                 return ApiResponse.error("Service not found with id: " + serviceId);
             }
 
-            if (!serviceItem.getSalon().getId().equals(salon.getId())) {
+            if (serviceItem.getSalon() == null || !serviceItem.getSalon().getId().equals(salon.getId())) {
                 return ApiResponse.error("All selected services must belong to the same salon");
             }
 
@@ -126,6 +149,7 @@ public class BookingServiceImpl implements BookingService {
 
         booking.setCustomer(customer);
         booking.setSalon(salon);
+        booking.setAssignedEmployee(assignedEmployee);
         booking.setServices(selectedServices);
         booking.setCustomerPhoneNumber(request.getCustomerPhoneNumber().trim());
         booking.setCustomerLocation(request.getCustomerLocation().trim());
@@ -144,7 +168,11 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public ApiResponse<List<BookingResponse>> getMyBookings() {
 
-        User customer = getCurrentUser();
+        User customer = getCurrentUserOrNull();
+
+        if (customer == null) {
+            return ApiResponse.error("Authenticated user not found");
+        }
 
         List<BookingResponse> response = bookingRepo
                 .findByCustomerIdOrderByCreatedAtDesc(customer.getId())
@@ -158,7 +186,11 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public ApiResponse<List<BookingResponse>> getMySalonBookings() {
 
-        User owner = getCurrentUser();
+        User owner = getCurrentUserOrNull();
+
+        if (owner == null) {
+            return ApiResponse.error("Authenticated user not found");
+        }
 
         Salon salon = salonRepo.findByOwnerId(owner.getId()).orElse(null);
 
@@ -178,7 +210,11 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public ApiResponse<List<BookingResponse>> getMySalonPendingBookings() {
 
-        User owner = getCurrentUser();
+        User owner = getCurrentUserOrNull();
+
+        if (owner == null) {
+            return ApiResponse.error("Authenticated user not found");
+        }
 
         Salon salon = salonRepo.findByOwnerId(owner.getId()).orElse(null);
 
@@ -196,10 +232,40 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    public ApiResponse<List<BookingResponse>> getMyEmployeeBookings() {
+
+        User employeeUser = getCurrentUserOrNull();
+
+        if (employeeUser == null) {
+            return ApiResponse.error("Authenticated user not found");
+        }
+
+        Salonemps employee = salonEmployeesRepo
+                .findByEmployeeIdAndStatus(employeeUser.getId(), EmployeeStatus.ACTIVE)
+                .orElse(null);
+
+        if (employee == null) {
+            return ApiResponse.error("You are not linked as an active employee");
+        }
+
+        List<BookingResponse> response = bookingRepo
+                .findByAssignedEmployeeIdOrderByCreatedAtDesc(employee.getId())
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+
+        return ApiResponse.success("Employee bookings returned successfully", response);
+    }
+
+    @Override
     @Transactional
     public ApiResponse<BookingResponse> acceptBooking(Long bookingId, OwnerBookingActionRequest request) {
 
-        User owner = getCurrentUser();
+        User owner = getCurrentUserOrNull();
+
+        if (owner == null) {
+            return ApiResponse.error("Authenticated user not found");
+        }
 
         Booking booking = bookingRepo.findById(bookingId).orElse(null);
 
@@ -213,6 +279,21 @@ public class BookingServiceImpl implements BookingService {
 
         if (booking.getStatus() != BookingStatus.PENDING) {
             return ApiResponse.error("Only pending bookings can be accepted");
+        }
+
+        if (request != null && request.getAssignedEmployeeId() != null) {
+            Salonemps assignedEmployee = validateAssignedEmployee(
+                    request.getAssignedEmployeeId(),
+                    booking.getSalon(),
+                    booking.getBookingDate(),
+                    booking.getBookingTime()
+            );
+
+            if (assignedEmployee == null) {
+                return ApiResponse.error("Selected employee is not valid or not available");
+            }
+
+            booking.setAssignedEmployee(assignedEmployee);
         }
 
         booking.setStatus(BookingStatus.ACCEPTED);
@@ -231,7 +312,11 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public ApiResponse<BookingResponse> rejectBooking(Long bookingId, OwnerBookingActionRequest request) {
 
-        User owner = getCurrentUser();
+        User owner = getCurrentUserOrNull();
+
+        if (owner == null) {
+            return ApiResponse.error("Authenticated user not found");
+        }
 
         Booking booking = bookingRepo.findById(bookingId).orElse(null);
 
@@ -263,7 +348,11 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public ApiResponse<BookingResponse> cancelMyBooking(Long bookingId) {
 
-        User customer = getCurrentUser();
+        User customer = getCurrentUserOrNull();
+
+        if (customer == null) {
+            return ApiResponse.error("Authenticated user not found");
+        }
 
         Booking booking = bookingRepo.findById(bookingId).orElse(null);
 
@@ -294,7 +383,11 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public ApiResponse<BookingResponse> completeBooking(Long bookingId) {
 
-        User owner = getCurrentUser();
+        User owner = getCurrentUserOrNull();
+
+        if (owner == null) {
+            return ApiResponse.error("Authenticated user not found");
+        }
 
         Booking booking = bookingRepo.findById(bookingId).orElse(null);
 
@@ -317,20 +410,114 @@ public class BookingServiceImpl implements BookingService {
         return ApiResponse.success("Booking completed successfully", mapToResponse(saved));
     }
 
-    private User getCurrentUser() {
+    @Override
+    @Transactional
+    public ApiResponse<BookingResponse> assignEmployee(Long bookingId, Long employeeId) {
+
+        User owner = getCurrentUserOrNull();
+
+        if (owner == null) {
+            return ApiResponse.error("Authenticated user not found");
+        }
+
+        if (employeeId == null) {
+            return ApiResponse.error("Employee id is required");
+        }
+
+        Booking booking = bookingRepo.findById(bookingId).orElse(null);
+
+        if (booking == null) {
+            return ApiResponse.error("Booking not found");
+        }
+
+        if (!isSalonOwner(owner, booking.getSalon())) {
+            return ApiResponse.error("You can only assign employees for your own salon");
+        }
+
+        if (booking.getStatus() == BookingStatus.REJECTED ||
+                booking.getStatus() == BookingStatus.CANCELLED ||
+                booking.getStatus() == BookingStatus.COMPLETED) {
+            return ApiResponse.error("You cannot assign employee to this booking status");
+        }
+
+        Salonemps employee = validateAssignedEmployee(
+                employeeId,
+                booking.getSalon(),
+                booking.getBookingDate(),
+                booking.getBookingTime()
+        );
+
+        if (employee == null) {
+            return ApiResponse.error("Selected employee is not valid or not available");
+        }
+
+        booking.setAssignedEmployee(employee);
+
+        Booking saved = bookingRepo.save(booking);
+
+        return ApiResponse.success("Employee assigned successfully", mapToResponse(saved));
+    }
+
+    private Salonemps validateAssignedEmployee(
+            Long employeeId,
+            Salon salon,
+            LocalDate bookingDate,
+            java.time.LocalTime bookingTime
+    ) {
+
+        if (employeeId == null || salon == null || bookingDate == null || bookingTime == null) {
+            return null;
+        }
+
+        Salonemps employee = salonEmployeesRepo.findById(employeeId).orElse(null);
+
+        if (employee == null) {
+            return null;
+        }
+
+        if (employee.getSalon() == null || !employee.getSalon().getId().equals(salon.getId())) {
+            return null;
+        }
+
+        if (employee.getStatus() != EmployeeStatus.ACTIVE) {
+            return null;
+        }
+
+        if (employee.getStartTime() != null && bookingTime.isBefore(employee.getStartTime())) {
+            return null;
+        }
+
+        if (employee.getEndTime() != null && bookingTime.isAfter(employee.getEndTime())) {
+            return null;
+        }
+
+        boolean employeeBusy = bookingRepo.existsByAssignedEmployeeIdAndBookingDateAndBookingTimeAndStatusIn(
+                employee.getId(),
+                bookingDate,
+                bookingTime,
+                List.of(BookingStatus.PENDING, BookingStatus.ACCEPTED)
+        );
+
+        return employeeBusy ? null : employee;
+    }
+
+    private User getCurrentUserOrNull() {
+
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            return null;
+        }
 
         String email = SecurityContextHolder
                 .getContext()
                 .getAuthentication()
                 .getName();
 
-        return userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+        return userRepo.findByEmail(email).orElse(null);
     }
 
     private boolean isSalonOwner(User owner, Salon salon) {
 
-        if (salon == null || salon.getOwner() == null) {
+        if (owner == null || salon == null || salon.getOwner() == null) {
             return false;
         }
 
@@ -345,30 +532,7 @@ public class BookingServiceImpl implements BookingService {
 
         if (booking.getCustomer() != null) {
             response.setCustomerId(booking.getCustomer().getId());
-            String firstName = booking.getCustomer().getFirstName();
-            String lastName = booking.getCustomer().getLastName();
-            String username = booking.getCustomer().getUsername();
-            String email = booking.getCustomer().getEmail();
-
-            String customerName = "";
-
-            if (firstName != null && !firstName.isBlank()) {
-                customerName += firstName.trim();
-            }
-
-            if (lastName != null && !lastName.isBlank()) {
-                customerName += " " + lastName.trim();
-            }
-
-            if (customerName.isBlank()) {
-                if (username != null && !username.isBlank()) {
-                    customerName = username;
-                } else {
-                    customerName = email;
-                }
-            }
-
-            response.setCustomerName(customerName);
+            response.setCustomerName(getUserDisplayName(booking.getCustomer()));
             response.setCustomerEmail(booking.getCustomer().getEmail());
         }
 
@@ -378,6 +542,21 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getSalon() != null) {
             response.setSalonId(booking.getSalon().getId());
             response.setSalonName(booking.getSalon().getName());
+        }
+
+        if (booking.getAssignedEmployee() != null) {
+            Salonemps employee = booking.getAssignedEmployee();
+
+            response.setAssignedEmployeeId(employee.getId());
+            response.setAssignedEmployeeName(employee.getFullName());
+            response.setAssignedEmployeeEmail(employee.getEmail());
+            response.setAssignedEmployeePhoneNumber(employee.getPhoneNumber());
+            response.setAssignedEmployeeSpecialty(employee.getSpecialty());
+            response.setAssignedEmployeeImageUrl(employee.getImageUrl());
+
+            if (employee.getEmployee() != null) {
+                response.setAssignedEmployeeUserId(employee.getEmployee().getId());
+            }
         }
 
         if (booking.getServices() != null) {
@@ -404,5 +583,35 @@ public class BookingServiceImpl implements BookingService {
         response.setStatus(booking.getStatus());
 
         return response;
+    }
+
+    private String getUserDisplayName(User user) {
+
+        String firstName = user.getFirstName();
+        String lastName = user.getLastName();
+        String username = user.getUsername();
+        String email = user.getEmail();
+
+        String name = "";
+
+        if (firstName != null && !firstName.isBlank()) {
+            name += firstName.trim();
+        }
+
+        if (lastName != null && !lastName.isBlank()) {
+            name += " " + lastName.trim();
+        }
+
+        if (name.isBlank()) {
+            if (username != null && !username.isBlank()) {
+                name = username;
+            } else if (email != null && !email.isBlank()) {
+                name = email;
+            } else {
+                name = "User";
+            }
+        }
+
+        return name.trim();
     }
 }

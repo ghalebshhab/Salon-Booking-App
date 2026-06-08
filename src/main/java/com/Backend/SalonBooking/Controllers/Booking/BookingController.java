@@ -70,4 +70,16 @@ public class BookingController {
     ) {
         return ResponseEntity.ok(bookingService.completeBooking(bookingId));
     }
+    @GetMapping("/employee/my")
+    public ResponseEntity<ApiResponse<List<BookingResponse>>> getMyEmployeeBookings() {
+        return ResponseEntity.ok(bookingService.getMyEmployeeBookings());
+    }
+
+    @PutMapping("/{bookingId}/assign-employee/{employeeId}")
+    public ResponseEntity<ApiResponse<BookingResponse>> assignEmployee(
+            @PathVariable Long bookingId,
+            @PathVariable Long employeeId
+    ) {
+        return ResponseEntity.ok(bookingService.assignEmployee(bookingId, employeeId));
+    }
 }

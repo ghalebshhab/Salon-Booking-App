@@ -13,6 +13,8 @@ public class OwnerBookingActionRequest {
 
     private String ownerNote;
 
-    // Optional: owner can suggest another time if he is busy
     private LocalTime ownerSuggestedTime;
+
+    // Optional: owner can assign employee while accepting booking
+    private Long assignedEmployeeId;
 }

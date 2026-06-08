@@ -1,5 +1,6 @@
 package com.Backend.SalonBooking.Entities.Bookings;
 
+import com.Backend.SalonBooking.Entities.SalonEmployees.Salonemps;
 import com.Backend.SalonBooking.Entities.SalonServices.SalonServicesItem;
 import com.Backend.SalonBooking.Entities.Salons.Salon;
 import com.Backend.SalonBooking.Entities.Users.User;
@@ -32,6 +33,10 @@ public class Booking {
     @ManyToOne
     @JoinColumn(name = "salon_id", nullable = false)
     private Salon salon;
+
+    @ManyToOne
+    @JoinColumn(name = "assigned_employee_id")
+    private Salonemps assignedEmployee;
 
     // The selected services, because user can choose more than one service
     @ManyToMany

@@ -15,13 +15,13 @@ public class CreateBookingRequest {
 
     private Long salonId;
 
-    // User can choose many services by checkboxes
     private List<Long> serviceIds;
+
+    // Optional: customer can choose employee, or leave it null for any employee
+    private Long assignedEmployeeId;
 
     private String customerPhoneNumber;
 
-    // You can send it as text from frontend, for example:
-    // "lat: 31.95, lng: 35.91" or "Amman - Jordan"
     private String customerLocation;
 
     private LocalDate bookingDate;

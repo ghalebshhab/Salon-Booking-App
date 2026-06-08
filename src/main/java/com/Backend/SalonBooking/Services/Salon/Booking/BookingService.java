@@ -17,6 +17,8 @@ public interface BookingService {
 
     ApiResponse<List<BookingResponse>> getMySalonPendingBookings();
 
+    ApiResponse<List<BookingResponse>> getMyEmployeeBookings();
+
     ApiResponse<BookingResponse> acceptBooking(Long bookingId, OwnerBookingActionRequest request);
 
     ApiResponse<BookingResponse> rejectBooking(Long bookingId, OwnerBookingActionRequest request);
@@ -24,4 +26,6 @@ public interface BookingService {
     ApiResponse<BookingResponse> cancelMyBooking(Long bookingId);
 
     ApiResponse<BookingResponse> completeBooking(Long bookingId);
+
+    ApiResponse<BookingResponse> assignEmployee(Long bookingId, Long employeeId);
 }
