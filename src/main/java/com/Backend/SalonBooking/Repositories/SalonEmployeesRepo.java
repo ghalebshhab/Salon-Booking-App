@@ -22,4 +22,22 @@ public interface SalonEmployeesRepo extends JpaRepository<Salonemps, Long> {
    );
 
    List<Salonemps> findBySalonIdAndStatus(Long salonId, EmployeeStatus status);
+
+   List<Salonemps> findBySalonIdAndStatusIn(Long salonId, List<EmployeeStatus> statuses);
+
+   Optional<Salonemps> findFirstByEmailIgnoreCaseAndStatus(String email, EmployeeStatus status);
+
+   Optional<Salonemps> findFirstByPhoneNumberAndStatus(String phoneNumber, EmployeeStatus status);
+
+   boolean existsBySalonIdAndEmailIgnoreCaseAndStatusIn(
+           Long salonId,
+           String email,
+           List<EmployeeStatus> statuses
+   );
+
+   boolean existsBySalonIdAndPhoneNumberAndStatusIn(
+           Long salonId,
+           String phoneNumber,
+           List<EmployeeStatus> statuses
+   );
 }

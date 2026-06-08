@@ -1,12 +1,10 @@
 package com.Backend.SalonBooking.Dtos.Salons;
 
 import com.Backend.SalonBooking.Entities.Salons.State;
-import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -16,17 +14,26 @@ import java.util.List;
 public class CreateSalonRequest {
 
     private String name;
+
     private String email;
+
     private String address;
+
     private String phoneNumber;
+
     private LocalTime openTime;
+
     private LocalTime closeTime;
+
     private String city;
+
     private State state;
 
     private List<String> Images;
 
-    private int maxNumOfEmployees;
+    private Integer maxNumOfEmployees;
 
-    private int currentNumOfEmployees;
+    private Integer currentNumOfEmployees;
+
+    private List<CreateSalonEmployeeRequest> employees;
 }

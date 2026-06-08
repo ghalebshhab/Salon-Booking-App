@@ -17,12 +17,18 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.Optional;
 
+import com.Backend.SalonBooking.Entities.SalonEmployees.EmployeeStatus;
+import com.Backend.SalonBooking.Entities.SalonEmployees.Salonemps;
+import com.Backend.SalonBooking.Repositories.SalonEmployeesRepo;
+import java.time.LocalDateTime;
+
 @Service
 @AllArgsConstructor
 public class AuthServiceImpl implements AuthService {
     private final UserRepo userRepo;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final SalonEmployeesRepo salonEmployeesRepo;
 
     @Override
     @Transactional
@@ -55,6 +61,7 @@ public class AuthServiceImpl implements AuthService {
 
         User savedUser = userRepo.save(user);
 
+        linkInvitedEmployeeIfExists(savedUser);
 
         RigesterResponse response = new RigesterResponse(
                 savedUser.getId(),
@@ -100,5 +107,32 @@ public class AuthServiceImpl implements AuthService {
 
 
         return ApiResponse.success("Login Successfully", response);
+    }
+
+
+    private void linkInvitedEmployeeIfExists(User savedUser) {
+
+        Salonemps invitation = salonEmployeesRepo
+                .findFirstByEmailIgnoreCaseAndStatus(savedUser.getEmail(), EmployeeStatus.INVITED)
+                .orElse(null);
+
+        if (invitation == null) {
+            invitation = salonEmployeesRepo
+                    .findFirstByPhoneNumberAndStatus(savedUser.getPhoneNumber(), EmployeeStatus.INVITED)
+                    .orElse(null);
+        }
+
+        if (invitation == null) {
+            return;
+        }
+
+        invitation.setEmployee(savedUser);
+        invitation.setStatus(EmployeeStatus.ACTIVE);
+        invitation.setJoinedAt(LocalDateTime.now());
+        salonEmployeesRepo.save(invitation);
+
+        savedUser.setRole(Role.EMPLOYEE);
+        savedUser.setSalon(invitation.getSalon());
+        userRepo.save(savedUser);
     }
 }

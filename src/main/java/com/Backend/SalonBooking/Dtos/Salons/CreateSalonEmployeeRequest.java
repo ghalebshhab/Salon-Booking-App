@@ -1,23 +1,15 @@
 package com.Backend.SalonBooking.Dtos.Salons;
 
-import com.Backend.SalonBooking.Entities.SalonEmployees.EmployeeStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class SalonEmployeeResponse {
-
-    private Long id;
-
-    private Long salonId;
-
-    private Long userId;
+public class CreateSalonEmployeeRequest {
 
     private String fullName;
 
@@ -32,12 +24,4 @@ public class SalonEmployeeResponse {
     private LocalTime startTime;
 
     private LocalTime endTime;
-
-    private EmployeeStatus status;
-
-    private Boolean invitationSent;
-
-    private LocalDateTime invitationSentAt;
-
-    private LocalDateTime joinedAt;
 }

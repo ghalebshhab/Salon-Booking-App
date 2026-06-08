@@ -16,6 +16,9 @@ import com.Backend.SalonBooking.Repositories.SalonRepo;
 import com.Backend.SalonBooking.Repositories.UserRepo;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.Backend.SalonBooking.Dtos.Salons.CreateSalonEmployeeRequest;
+import com.Backend.SalonBooking.Entities.SalonEmployees.Salonemps;
+import com.Backend.SalonBooking.Services.SalonEmployees.SalonEmployeeServiceImpl;
 
 import java.time.LocalTime;
 import java.util.List;
@@ -28,40 +31,71 @@ public class SalonServiceImpl implements SalonService {
     private final UserRepo userRepo;
     private final SalonRepo salonRepo;
     private final SalonEmployeesRepo salonEmployeesRepo;
+    private final SalonEmployeeServiceImpl salonEmployeeService;
 
     @Override
-    public ApiResponse<CreateSalonResponse> createSalon(CreateSalonRequest createSalonRequest,String emailFromToken) {
+    public ApiResponse<CreateSalonResponse> createSalon(CreateSalonRequest createSalonRequest, String emailFromToken) {
 
-    if(createSalonRequest.getName()==null){
-        return ApiResponse.error("Name is required");
-    }
-    if(createSalonRequest.getCity()==null){
-        return ApiResponse.error("City is required");
-    }
-    if(createSalonRequest.getOpenTime()==null){
-        return ApiResponse.error("Open time is required");
-    }
-    if (createSalonRequest.getCloseTime()==null){
-        return ApiResponse.error("Close time is required");
-    }
-    if (createSalonRequest.getAddress()==null){
-        return ApiResponse.error("Address is required");
-    }
-    if (createSalonRequest.getEmail()==null){
-        return ApiResponse.error("Email is required");
-    }
-    if (createSalonRequest.getPhoneNumber() == null ||
+        if (createSalonRequest.getName() == null || createSalonRequest.getName().isBlank()) {
+            return ApiResponse.error("Name is required");
+        }
+
+        if (createSalonRequest.getCity() == null || createSalonRequest.getCity().isBlank()) {
+            return ApiResponse.error("City is required");
+        }
+
+        if (createSalonRequest.getOpenTime() == null) {
+            return ApiResponse.error("Open time is required");
+        }
+
+        if (createSalonRequest.getCloseTime() == null) {
+            return ApiResponse.error("Close time is required");
+        }
+
+        if (!createSalonRequest.getOpenTime().isBefore(createSalonRequest.getCloseTime())) {
+            return ApiResponse.error("Open time must be before close time");
+        }
+
+        if (createSalonRequest.getAddress() == null || createSalonRequest.getAddress().isBlank()) {
+            return ApiResponse.error("Address is required");
+        }
+
+        if (createSalonRequest.getEmail() == null || createSalonRequest.getEmail().isBlank()) {
+            return ApiResponse.error("Email is required");
+        }
+
+        if (createSalonRequest.getPhoneNumber() == null ||
                 (!createSalonRequest.getPhoneNumber().matches("^\\+9627\\d{8}$")
                         && !createSalonRequest.getPhoneNumber().matches("^07\\d{8}$"))) {
-        return ApiResponse.error("Phone number must be like +9627XXXXXXXX or 07XXXXXXXX");
-    }
+            return ApiResponse.error("Phone number must be like +9627XXXXXXXX or 07XXXXXXXX");
+        }
 
-    User user=userRepo.findByEmail(emailFromToken).orElse(null);
-        if(user==null){
+        if (createSalonRequest.getMaxNumOfEmployees() == null ||
+                createSalonRequest.getMaxNumOfEmployees() <= 0) {
+            return ApiResponse.error("Max number of employees is required and must be greater than 0");
+        }
+
+        List<CreateSalonEmployeeRequest> employeeRequests =
+                createSalonRequest.getEmployees() == null
+                        ? List.of()
+                        : createSalonRequest.getEmployees();
+
+        if (employeeRequests.size() > createSalonRequest.getMaxNumOfEmployees()) {
+            return ApiResponse.error("Employees list cannot be greater than max employees");
+        }
+
+        User user = userRepo.findByEmail(emailFromToken).orElse(null);
+
+        if (user == null) {
             return ApiResponse.error("User With This Email not found");
         }
 
-        Salon salon=new Salon();
+        if (salonRepo.existsByOwnerId(user.getId())) {
+            return ApiResponse.error("You already have a salon");
+        }
+
+        Salon salon = new Salon();
+
         salon.setCity(createSalonRequest.getCity());
         salon.setAddress(createSalonRequest.getAddress());
         salon.setEmail(createSalonRequest.getEmail());
@@ -69,21 +103,34 @@ public class SalonServiceImpl implements SalonService {
         salon.setName(createSalonRequest.getName());
         salon.setOpenTime(createSalonRequest.getOpenTime());
         salon.setCloseTime(createSalonRequest.getCloseTime());
-        salon.setState(calculateState(createSalonRequest.getOpenTime(),createSalonRequest.getCloseTime()));
-        user.setRole(Role.OWNER);
-        userRepo.save(user);
+        salon.setState(calculateState(createSalonRequest.getOpenTime(), createSalonRequest.getCloseTime()));
         salon.setOwner(user);
         salon.setImages(createSalonRequest.getImages());
-        salon.setCurrentNumOfEmployees(createSalonRequest.getCurrentNumOfEmployees());
         salon.setMaxNumOfEmployees(createSalonRequest.getMaxNumOfEmployees());
-        salonRepo.save(salon);
+        salon.setCurrentNumOfEmployees(employeeRequests.size());
 
-        CreateSalonResponse response=toResponse(salon);
+        user.setRole(Role.OWNER);
+        userRepo.save(user);
 
-      return ApiResponse.success("Salon Created Successfully", response);
+        Salon savedSalon = salonRepo.save(salon);
 
+        for (CreateSalonEmployeeRequest employeeRequest : employeeRequests) {
+
+            ApiResponse<String> validation = salonEmployeeService.validateEmployeeRequest(employeeRequest, savedSalon);
+
+            if (!validation.isSuccess()) {
+                return ApiResponse.error(validation.getMessage());
+            }
+
+            Salonemps employee = salonEmployeeService.buildInvitedEmployee(savedSalon, employeeRequest);
+            Salonemps savedEmployee = salonEmployeesRepo.save(employee);
+            salonEmployeeService.sendInvitationAndUpdate(savedEmployee);
+        }
+
+        CreateSalonResponse response = toResponse(savedSalon);
+
+        return ApiResponse.success("Salon Created Successfully", response);
     }
-
     @Override
     public ApiResponse<CreateSalonResponse> updateSalon(UpdateSalonInfoRequest updateSalonInfoRequest,
                         String emailFromToken,
@@ -275,15 +322,13 @@ public class SalonServiceImpl implements SalonService {
 
         SalonEmployeeResponse response = new SalonEmployeeResponse();
 
-        response.setEmployeeRecordId(salonEmployee.getId());
+        response.setId(salonEmployee.getId());
         response.setStatus(salonEmployee.getStatus());
         response.setJoinedAt(salonEmployee.getJoinedAt());
 
         if (user != null) {
             response.setUserId(user.getId());
-            response.setFirstName(user.getFirstName());
-            response.setLastName(user.getLastName());
-            response.setUsername(user.getUsername());
+           response.setFullName(user.getFirstName() + " " + user.getLastName());
             response.setEmail(user.getEmail());
             response.setPhoneNumber(user.getPhoneNumber());
         }

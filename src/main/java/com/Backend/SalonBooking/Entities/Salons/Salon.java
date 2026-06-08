@@ -55,10 +55,9 @@ public class Salon {
     private Boolean isDeleted = false;
 
     @Column(nullable = false)
-   private int maxNumOfEmployees;
-
+    private Integer maxNumOfEmployees;
     @Column(nullable = false)
-    private int currentNumOfEmployees;
+    private Integer currentNumOfEmployees;
 
 
 
